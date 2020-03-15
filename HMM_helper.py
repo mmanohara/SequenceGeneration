@@ -84,9 +84,19 @@ def states_to_wordclouds(hmm, obs_map, max_words=50, show=True):
 ####################
 
 def parse_observations(text):
+    '''
+    This function tokenizes the words. It separates punctuation from words (expect apostrophes and hyphens).
+    It doesn't allow invalid_symbols to appear in the middle of a sentence; other symbols that aren't valid
+    show up as separate tokens. Returns a map from observations to indices and a list of indices corresponding
+    to the sequences. 
+    Also basically deletes every number in the texts.
+    '''
     # Convert text to dataset.
     valid_symbols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',\
               'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', "'", '-']
+    invalid_symbols = ['.', '?', '!', ';']
+    for i in range(200):
+        invalid_symbols.append(str(i))
     lines = [line.split() for line in text.split('\n') if line.split()]
     obs_counter = 0
     obs = []
@@ -101,6 +111,7 @@ def parse_observations(text):
             check1 = False
             bad_char = ''
             if word not in obs_map:
+                check1 = False
                 for char in word:
                     if char not in valid_symbols:
                         check1 = True
@@ -108,11 +119,11 @@ def parse_observations(text):
                         break
                 if check1:
                     word = word.replace(bad_char, '')
-                    if word not in obs_map:
+                    if word not in obs_map and word not in invalid_symbols:
                         # Add unique words to the observations map.
                         obs_map[word] = obs_counter
                         obs_counter += 1
-                    if bad_char not in obs_map:
+                    if (bad_char not in obs_map) and (bad_char not in invalid_symbols):
                         obs_map[bad_char] = obs_counter
                         obs_counter += 1
                 else:
@@ -120,8 +131,9 @@ def parse_observations(text):
                     obs_map[word] = obs_counter
                     obs_counter += 1
                         # Add the encoded word.
-            obs_elem.append(obs_map[word])
-            if bad_char != '':
+            if word not in invalid_symbols:
+                obs_elem.append(obs_map[word])
+            if bad_char != '' and bad_char not in invalid_symbols:
                 obs_elem.append(obs_map[bad_char])
         
         # Add the encoded sequence.
@@ -142,10 +154,22 @@ def sample_sentence(hmm, obs_map, n_words=100):
     obs_map_r = obs_map_reverser(obs_map)
 
     # Sample and convert sentence.
-    emission, states = hmm.generate_emission(n_words)
-    sentence = [obs_map_r[i] for i in emission]
+    emission, states = hmm.generate_emission(n_words, obs_map_r)
+    sentence = ''
+    valid_symbols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',\
+              'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', "'", '-', 
+                    '1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+    for i in range(len(emission)):
+        space = True
+        for char in obs_map_r[emission[i]]:
+            if char not in valid_symbols:
+                space = False
+                break
+        if space:
+            sentence += ' '
+        sentence += obs_map_r[emission[i]]
 
-    return ' '.join(sentence).capitalize()
+    return sentence[1:].capitalize()
 
 
 ####################
