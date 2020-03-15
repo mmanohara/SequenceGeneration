@@ -90,6 +90,7 @@ def parse_observations(text):
     show up as separate tokens. Returns a map from observations to indices and a list of indices corresponding
     to the sequences. 
     Also basically deletes every number in the texts.
+    ALSO IGNORES PUNCTUATION AT THE END OF THE LINE THIS IS IMPORTANT
     '''
     # Convert text to dataset.
     valid_symbols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',\
@@ -140,6 +141,70 @@ def parse_observations(text):
         obs.append(obs_elem)
 
     return obs, obs_map
+
+def parse_ends(text):
+    '''
+    Converts the end punctuations into sets of sequences
+    '''
+    # Convert text to dataset.
+    lines = [line.split() for line in text.split('\n') if line.split()]
+    endlist = []
+    for line in lines:
+        endlist.append(line[-1][-1])
+    valid_ends = [',', '.', '?', '!', ':', ';']
+    valid_letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',\
+              'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+    end_map = {}
+    sequences = []
+    sequence = []
+    map_ind = 0
+    i = 0
+    num_valids = 0
+    #print(endlist)
+    print(len(endlist))
+    while 1:
+        if endlist[i] in valid_ends:
+            if endlist[i] not in end_map:
+                end_map[endlist[i]] = map_ind
+                map_ind += 1
+            num_valids += 1
+            sequence.append(endlist[i])
+        if endlist[i] in valid_letters:
+            if ' ' not in end_map:
+                end_map[' '] = map_ind
+                map_ind += 1
+            num_valids += 1
+            sequence.append(' ')
+        i += 1
+        if num_valids == 14:
+            sequences.append(sequence)
+            sequence = []
+            num_valids = 0
+        if i == len(endlist):
+            break
+    return sequences, end_map
+    
+#    obs_counter = 0
+#    obs = []
+#    obs_map = {}
+
+#    for line in lines:
+#        obs_elem = []
+        
+#        for word in line:
+#            word = re.sub(r'[^\w]', '', word).lower()
+#            if word not in obs_map:
+#                # Add unique words to the observations map.
+#                obs_map[word] = obs_counter
+#                obs_counter += 1
+            
+            # Add the encoded word.
+#            obs_elem.append(obs_map[word])
+        
+        # Add the encoded sequence.
+#        obs.append(obs_elem)
+
+#    return obs, obs_map
 
 def obs_map_reverser(obs_map):
     obs_map_r = {}
