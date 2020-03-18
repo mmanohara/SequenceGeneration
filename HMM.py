@@ -419,8 +419,7 @@ class HiddenMarkovModel:
 
         pass
 
-
-    def generate_emission(self, M):
+    def generate_emission(self, M, obs_map):
         '''
         Generates an emission of length M, assuming that the starting state
         is chosen uniformly at random. 
@@ -454,7 +453,8 @@ class HiddenMarkovModel:
                 states.append(start_state)
                 emission.append(obs)
                 inc = True
-                for char in obs:
+                # If punctuation, generate extra symbols because they aren't words.
+                for char in obs_map[obs]:
                     if char not in valid_symbols:
                         inc = False
                         break
@@ -468,7 +468,8 @@ class HiddenMarkovModel:
                 obs = np.random.choice(np.arange(self.D), p = probs)
                 states.append(state)
                 emission.append(obs)
-                for char in obs:
+                inc = True
+                for char in obs_map[obs]:
                     if char not in valid_symbols:
                         inc = False
                         break
@@ -479,6 +480,119 @@ class HiddenMarkovModel:
         ###
 
         return emission, states
+    
+    def generate_emission_t(self, M, obs_map):
+        '''
+        Generates an emission of length M, assuming that the starting state
+        is chosen uniformly at random. 
+
+        Arguments:
+            M:          Length of the emission to generate.
+
+        Returns:
+            emission:   The randomly generated emission as a list.
+
+            states:     The randomly generated states as a list.
+        This function is specifically used for wordcloud generation to track the
+        progress in emission generation.
+        '''
+
+        emission = []
+        states = []
+        valid_symbols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',\
+              'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', "'", '-']
+        
+
+        ###
+        ###
+        ### 
+        # O[i, j] is the probability of observing j given state i.
+        # A[i, j] is the probability of transiting from i to j
+        i = 0
+        while i != M:
+            if (i % 10000 == 0):
+                print("Completed: {}".format(i / M))
+            if(len(states) == 0):
+                start_state = np.random.randint(self.L)
+                probs = self.O[start_state] / np.sum(self.O[start_state])
+                obs = np.random.choice(np.arange(self.D), p = probs)
+                states.append(start_state)
+                emission.append(obs)
+                inc = True
+                for char in obs_map[obs]:
+                    if char not in valid_symbols:
+                        inc = False
+                        break
+                if inc:
+                    i += 1
+                    
+            else:
+                probs = self.A[states[-1]] / np.sum(self.A[states[-1]])
+                state = np.random.choice(np.arange(self.L), p = probs)
+                probs = self.O[state] / np.sum(self.O[state])
+                obs = np.random.choice(np.arange(self.D), p = probs)
+                states.append(state)
+                emission.append(obs)
+                inc = True
+                for char in obs_map[obs]:
+                    if char not in valid_symbols:
+                        inc = False
+                        break
+                if inc:
+                    i += 1
+        ###
+        ###
+        ###
+
+        return emission, states
+
+    def generate_ends(self, init_state, obs_map, obs_map_r, cap=False):
+        '''
+        Generates an end punctuation given the current state of the HMM.
+        '''
+
+
+        ###
+        ###
+        ### 
+        ### TODO: Insert Your Code Here (2F)
+        ###
+        ###
+        ###
+        # Always select period.
+        if cap:
+            punctuations = ['.']
+        else:
+            # Valid end punctuations
+            punctuations = [',', '.', '?', ':', ';', ' ']
+        # Get observation indices of punctuation
+        puc_idx = []
+        for puc in punctuations:
+            puc_idx.append(obs_map[puc])
+        puc_weights = []
+        # Append the probabilities
+        for puc_id in puc_idx:
+            puc_weights.append(self.O[init_state][puc_id])
+        # Normalize probabilities
+        puc_weights = [puc_weights[i] / sum(puc_weights) for i in range(len(puc_weights))]
+        # Choose end punctuation and return it
+        return obs_map_r[np.random.choice(puc_idx, p = puc_weights)]
+
+    def generate_from_list(self, init_state, lst, obs_map, obs_map_r):
+        '''
+        This function picks a random element from a list given the state it's in.
+        '''
+        # Get object indices of elements
+        ob_idx = []
+        for word in lst:
+            ob_idx.append(obs_map[word])
+        ob_weights = []
+        # Append objects' emission probabilities
+        for ob_id in ob_idx:
+            ob_weights.append(self.O[init_state][ob_id])
+        # Normalize probabilities and choose an element.
+        ob_weights = [ob_weights[i] / sum(ob_weights) for i in range(len(ob_weights))]
+        return obs_map_r[np.random.choice(ob_idx, p = ob_weights)]
 
 
     def probability_alphas(self, x):
@@ -608,7 +722,8 @@ def unsupervised_HMM(X, n_states, N_iters):
     
     # Compute L and D.
     L = n_states
-    D = len(observations)
+    D = max(observations) + 1
+    print(D)
 
     # Randomly initialize and normalize matrix A.
     random.seed(2020)

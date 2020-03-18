@@ -9,7 +9,8 @@
 import re
 import numpy as np
 import matplotlib.pyplot as plt
-#from wordcloud import WordCloud
+from tqdm import tqdm
+from wordcloud import WordCloud
 #from matplotlib import animation
 #from matplotlib.animation import FuncAnimation
 
@@ -59,7 +60,7 @@ def states_to_wordclouds(hmm, obs_map, max_words=50, show=True):
     wordclouds = []
 
     # Generate a large emission.
-    emission, states = hmm.generate_emission(M)
+    emission, states = hmm.generate_emission_t(M, obs_map_r)
 
     # For each state, get a list of observations that have been emitted
     # from that state.
@@ -90,12 +91,16 @@ def parse_observations(text):
     show up as separate tokens. Returns a map from observations to indices and a list of indices corresponding
     to the sequences. 
     Also basically deletes every number in the texts.
-    ALSO IGNORES PUNCTUATION AT THE END OF THE LINE THIS IS IMPORTANT
+     not anymore ALSO IGNORES PUNCTUATION AT THE END OF THE LINE THIS IS IMPORTANT
     '''
     # Convert text to dataset.
+    # Symbols that won't be split from words
     valid_symbols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',\
               'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', "'", '-']
-    invalid_symbols = ['.', '?', '!', ';']
+    # Symbols corresponding to punctuation at the end of a line
+    end_punctuation = [',', '.', ':', '?', ')']
+    # Ignore all the numbers
+    invalid_symbols = []
     for i in range(200):
         invalid_symbols.append(str(i))
     lines = [line.split() for line in text.split('\n') if line.split()]
@@ -108,22 +113,26 @@ def parse_observations(text):
         
         for word in line:
             #word = re.sub(r'[^\w]', '', word).lower()
+            # Make the word lowercase, keep track of punctuation character
             word = word.lower()
             check1 = False
             bad_char = ''
             if word not in obs_map:
                 check1 = False
+                # Check that the word is completely valid
                 for char in word:
                     if char not in valid_symbols:
                         check1 = True
                         bad_char = char
                         break
                 if check1:
+                    # Remove the punctuation
                     word = word.replace(bad_char, '')
                     if word not in obs_map and word not in invalid_symbols:
                         # Add unique words to the observations map.
                         obs_map[word] = obs_counter
                         obs_counter += 1
+                    # Add the punctuation as a symbol if it's not invalid
                     if (bad_char not in obs_map) and (bad_char not in invalid_symbols):
                         obs_map[bad_char] = obs_counter
                         obs_counter += 1
@@ -132,11 +141,18 @@ def parse_observations(text):
                     obs_map[word] = obs_counter
                     obs_counter += 1
                         # Add the encoded word.
+            # Append the word if not invalid
             if word not in invalid_symbols:
                 obs_elem.append(obs_map[word])
+            # If punctuation, add the punctuation as a symbol
             if bad_char != '' and bad_char not in invalid_symbols:
                 obs_elem.append(obs_map[bad_char])
-        
+        # Add spaces at the end of lines without any punctuation to indicate no end punctuation.
+        if obs_elem != [] and obs_map_reverser(obs_map)[obs_elem[-1]] not in end_punctuation:
+            if ' ' not in obs_map:
+                obs_map[' '] = obs_counter
+                obs_counter += 1
+            obs_elem.append(obs_map[' '])
         # Add the encoded sequence.
         obs.append(obs_elem)
 
@@ -184,27 +200,6 @@ def parse_ends(text):
             break
     return sequences, end_map
     
-#    obs_counter = 0
-#    obs = []
-#    obs_map = {}
-
-#    for line in lines:
-#        obs_elem = []
-        
-#        for word in line:
-#            word = re.sub(r'[^\w]', '', word).lower()
-#            if word not in obs_map:
-#                # Add unique words to the observations map.
-#                obs_map[word] = obs_counter
-#                obs_counter += 1
-            
-            # Add the encoded word.
-#            obs_elem.append(obs_map[word])
-        
-        # Add the encoded sequence.
-#        obs.append(obs_elem)
-
-#    return obs, obs_map
 
 def obs_map_reverser(obs_map):
     obs_map_r = {}
@@ -227,13 +222,14 @@ def sample_sentence(hmm, obs_map, n_words=100):
     for i in range(len(emission)):
         space = True
         for char in obs_map_r[emission[i]]:
+            # Don't add a space if it's punctuation.
             if char not in valid_symbols:
                 space = False
                 break
         if space:
             sentence += ' '
         sentence += obs_map_r[emission[i]]
-
+    # Ignore the first space and capitalize.
     return sentence[1:].capitalize()
 
 
